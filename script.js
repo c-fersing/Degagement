@@ -53,18 +53,25 @@ function traiterHTML(doc) {
   currentData = rows.map((row) =>
     [...row.querySelectorAll("td, th")].map((cell) => cell.textContent.trim()),
   );
+
+  // 🔹 Suppression de la première ligne (titre)
+  if (currentData.length > 0) {
+    currentData.shift();
+  }
+
   currentData = calculerPrix(currentData);
   afficherResultat(currentData);
   document.getElementById("exportBtn").style.display = "inline-block";
 }
 
+
 function calculerPrix(data) {
   const today = new Date();
   today.setHours(0, 0, 0, 0); // normalisation à minuit
 
-  // Ajout des en-têtes supplémentaires (ligne 2 en VBA => index 1)
-  if (data[1]) {
-    data[1].push(
+  // Ajout des en-têtes supplémentaires (après retrait du titre, l’en-tête est à l’index 0)
+  if (data[0]) {
+    data[0].push(
       "Prix Dégagement",
       "% appliqué",
       "Samedi",
@@ -75,7 +82,7 @@ function calculerPrix(data) {
   }
 
   // Parcourt les lignes de données à partir de l'index 2 (ligne 3 Excel)
-  for (let i = 2; i < data.length; i++) {
+  for (let i = 1; i < data.length; i++) {
     const dlcStr = data[i][3]; // DLC en colonne D (index 3)
     const prixStr = data[i][8]; // Prix en colonne I (index 8)
 
@@ -243,7 +250,7 @@ function exporterCSV(data) {
   };
 
   // Conserver uniquement l’en-tête (index 1) et les données (index ≥ 2)
-  const filteredData = data.slice(1);
+  const filteredData = data.slice(0);
 
   // Générer le CSV avec BOM UTF‑8 pour gérer les accents
   const csvContent = "\uFEFF" + filteredData.map(safeRow).join("\n");
@@ -259,5 +266,4 @@ function exporterCSV(data) {
 
   URL.revokeObjectURL(url);
 }
-
 
