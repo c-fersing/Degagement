@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Import HTML & Calcul Prix</title>
+  <link rel="stylesheet" href="Style.css">
+</head>
+<body>
+  <header>
+    <h1>Importer un fichier HTML et calculer les prix</h1>
+  </header>
+
+  <main>
+    <section class="controls">
+      <input type="file" id="fileInput" accept=".html,.htm">
+      <button id="exportBtn" style="display:none;">Exporter en CSV</button>
+    </section>
+
+    <section id="errors" aria-live="polite"></section>
+
+    <section id="result"></section>
+  </main>
+
+  <script src="Script.js"></script>
+</body>
+</html>
