@@ -48,6 +48,36 @@ document
     reader.readAsText(file);
   });
 
+// Gestion du drag & drop
+const dropZone = document.getElementById("dropZone");
+
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("dragover");
+});
+
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("dragover");
+
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith(".html")) {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(ev.target.result, "text/html");
+      traiterHTML(doc); // réutilise ta fonction existante
+    };
+    reader.readAsText(file);
+  } else {
+    alert("Veuillez déposer un fichier HTML valide.");
+  }
+});
+
 function traiterHTML(doc) {
   const rows = [...doc.querySelectorAll("table tr")];
   currentData = rows.map((row) =>
@@ -266,4 +296,5 @@ function exporterCSV(data) {
 
   URL.revokeObjectURL(url);
 }
+
 
