@@ -114,7 +114,8 @@ function calculerPrix(data) {
   // Parcourt les lignes de données à partir de l'index 2 (ligne 3 Excel)
   for (let i = 1; i < data.length; i++) {
     const dlcStr = data[i][3]; // DLC en colonne D (index 3)
-    const prixStr = data[i][8]; // Prix en colonne I (index 8)
+    // const prixStr = data[i][8]; // Prix en colonne I (index 8)
+    const prixStr = data[i][9]; // Prix en colonne J (index 9) Base 8
 
     const dlc = parseDateFR(dlcStr);
     if (!dlc) {
@@ -258,7 +259,7 @@ function exporterCSV(data) {
   const colCode = 0;          // Colonne A = Code
   const colDesignation = 1;   // Colonne B = Designation
   const colDLC = 3;           // Colonne D = DLC
-  const colBaseCo = 8;        // Colonne H = Base Co
+  const colBaseCo = 9;        // Colonne I = Base 8
   const colPrixDegagement = data[1].length - 6; // Prix Dégagement ajouté en premier des colonnes calculées
 
   // Fonction pour sécuriser les champs CSV
@@ -296,5 +297,6 @@ function exporterCSV(data) {
 
   URL.revokeObjectURL(url);
 }
+
 
 
