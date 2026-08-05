@@ -108,6 +108,7 @@ function calculerPrix(data) {
       "Dimanche",
       "Fériés",
       "Ajustement",
+      "Prix tronqué",
     );
   }
 
@@ -172,12 +173,15 @@ function calculerPrix(data) {
     const prix = parseFloat(String(prixStr).replace(",", "."));
     let prixDegagement = "";
     let pourcentage = "";
+    let prixTronque = "";
     if (!isNaN(prix)) {
       prixDegagement = (prix * reduction).toFixed(2);
       pourcentage = ((1 - reduction) * 100).toFixed(0) + "%";
+      prixTronque = (Math.floor(parseFloat(prixDegagement) * 10) / 10).toFixed(2);
     } else {
       prixDegagement = "Prix manquant";
       pourcentage = "";
+      prixTronque = "";
     }
 
     // Ajout des colonnes calculées
@@ -188,6 +192,7 @@ function calculerPrix(data) {
       nbDimanche,
       nbFeries,
       nbAjustement,
+      prixTronque,
     );
   }
 
@@ -260,7 +265,8 @@ function exporterCSV(data) {
   const colDesignation = 1;   // Colonne B = Designation
   const colDLC = 3;           // Colonne D = DLC
   const colBaseCo = 9;        // Colonne I = Base 8
-  const colPrixDegagement = data[1].length - 6; // Prix Dégagement ajouté en premier des colonnes calculées
+  const colPrixDegagement = data[1].length - 7; // Prix Dégagement ajouté en premier des colonnes calculées
+  const colPrixTronque = data[1].length - 1; // Prix Tronque soit la derniere colonne
 
   // Fonction pour sécuriser les champs CSV
   const safeRow = row => {
@@ -269,8 +275,14 @@ function exporterCSV(data) {
       row[colDesignation] ?? "",
       row[colDLC] ?? "",
       row[colBaseCo] ?? "",
-      row[colPrixDegagement] ?? ""
-    ];
+      // conversion du prix : nombre → string avec virgule
+      (row[colPrixDegagement] != null
+      ? String(row[colPrixDegagement]).replace(".", ",")
+      : ""),
+      (row[colPrixTronque] != null
+      ? String(row[colPrixTronque]).replace(".", ",")
+      : ""),
+  ];
     return subset.map(val => {
       const s = String(val);
       if ([",", "\"", "\n", "\r"].some(ch => s.includes(ch))) {
@@ -297,6 +309,5 @@ function exporterCSV(data) {
 
   URL.revokeObjectURL(url);
 }
-
 
 
