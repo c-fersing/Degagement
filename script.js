@@ -92,6 +92,8 @@ function traiterHTML(doc) {
   currentData = calculerPrix(currentData);
   afficherResultat(currentData);
   document.getElementById("exportBtn").style.display = "inline-block";
+  document.getElementById("toggleBtn").style.display = "inline-block";
+
 }
 
 
@@ -103,12 +105,12 @@ function calculerPrix(data) {
   if (data[0]) {
     data[0].push(
       "Prix Dégagement",
+      "Prix tronqué",
       "% appliqué",
       "Samedi",
       "Dimanche",
       "Fériés",
       "Ajustement",
-      "Prix tronqué",
     );
   }
 
@@ -120,7 +122,7 @@ function calculerPrix(data) {
 
     const dlc = parseDateFR(dlcStr);
     if (!dlc) {
-      data[i].push("", "", 0, 0, 0, 0);
+      data[i].push("", "", "", 0, 0, 0, 0);
       continue;
     }
     dlc.setHours(0, 0, 0, 0);
@@ -178,6 +180,8 @@ function calculerPrix(data) {
       prixDegagement = (prix * reduction).toFixed(2);
       pourcentage = ((1 - reduction) * 100).toFixed(0) + "%";
       prixTronque = (Math.floor(parseFloat(prixDegagement) * 10) / 10).toFixed(2);
+      prixTronque = `<span class="blueprice">${prixTronque}</span>`;
+
     } else {
       prixDegagement = "Prix manquant";
       pourcentage = "";
@@ -187,12 +191,12 @@ function calculerPrix(data) {
     // Ajout des colonnes calculées
     data[i].push(
       prixDegagement,
+      prixTronque,
       pourcentage,
       nbSamedi,
       nbDimanche,
       nbFeries,
       nbAjustement,
-      prixTronque,
     );
   }
 
@@ -247,13 +251,17 @@ function appliquerBareme(ecart) {
 
 function afficherResultat(data) {
   const container = document.getElementById("result");
-  let html = "<table>";
-  data.forEach((row) => {
-    html += "<tr>" + row.map((cell) => `<td>${cell}</td>`).join("") + "</tr>";
+  let html = '<table id="myTable">';
+
+  data.forEach((row, index) => {
+    const grey = (index % 5 === 0) ? ' class="row-grey"' : '';
+    html += `<tr${grey}>` + row.map((cell) => `<td>${cell}</td>`).join("") + "</tr>";
   });
+
   html += "</table>";
   container.innerHTML = html;
 }
+
 
 document.getElementById("exportBtn").addEventListener("click", function () {
   exporterCSV(currentData);
@@ -265,8 +273,8 @@ function exporterCSV(data) {
   const colDesignation = 1;   // Colonne B = Designation
   const colDLC = 3;           // Colonne D = DLC
   const colBaseCo = 9;        // Colonne I = Base 8
-  const colPrixDegagement = data[1].length - 7; // Prix Dégagement ajouté en premier des colonnes calculées
-  const colPrixTronque = data[1].length - 1; // Prix Tronque soit la derniere colonne
+  const colPrixDegagement = 12; // Prix Dégagement ajouté en premier des colonnes calculées
+  const colPrixTronque = 13; // Prix Tronque soit la derniere colonne
 
   // Fonction pour sécuriser les champs CSV
   const safeRow = row => {
@@ -309,5 +317,20 @@ function exporterCSV(data) {
 
   URL.revokeObjectURL(url);
 }
+
+function toggleColumns(indexes) {
+  const table = document.getElementById("myTable");
+  const rows = table.querySelectorAll("tr");
+
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("th, td");
+    indexes.forEach(i => {
+      if (cells[i]) {
+        cells[i].classList.toggle("hide-col");
+      }
+    });
+  });
+}
+
 
 
