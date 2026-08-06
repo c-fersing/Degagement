@@ -180,7 +180,6 @@ function calculerPrix(data) {
       prixDegagement = (prix * reduction).toFixed(2);
       pourcentage = ((1 - reduction) * 100).toFixed(0) + "%";
       prixTronque = (Math.floor(parseFloat(prixDegagement) * 10) / 10).toFixed(2);
-      prixTronque = `<span class="blueprice">${prixTronque}</span>`;
 
     } else {
       prixDegagement = "Prix manquant";
