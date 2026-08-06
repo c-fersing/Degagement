@@ -255,7 +255,12 @@ function afficherResultat(data) {
 
   data.forEach((row, index) => {
     const grey = (index % 5 === 0) ? ' class="row-grey"' : '';
-    html += `<tr${grey}>` + row.map((cell) => `<td>${cell}</td>`).join("") + "</tr>";
+    html += `<tr${grey}>` +
+      row.map((cell, colIndex) => {
+        const isblue = (index > 0 && colIndex === 13) ? ' class="blueprice"' : '';
+        return `<td${isblue}>${cell}</td>`;
+      }).join("") +
+      "</tr>";
   });
 
   html += "</table>";
@@ -331,6 +336,5 @@ function toggleColumns(indexes) {
     });
   });
 }
-
 
 
