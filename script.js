@@ -92,6 +92,7 @@ function traiterHTML(doc) {
   currentData = calculerPrix(currentData);
   afficherResultat(currentData);
   document.getElementById("exportBtn").style.display = "inline-block";
+  document.getElementById("exportBtnXls").style.display = "inline-block";
   document.getElementById("toggleBtn").style.display = "inline-block";
 
 }
@@ -335,5 +336,67 @@ function toggleColumns(indexes) {
     });
   });
 }
+
+document.getElementById("exportBtnXls").addEventListener("click", function () {
+  exporterXLSX(currentData);
+});
+
+function exporterXLSX(data) {
+  const colCode = 0;
+  const colDesignation = 1;
+  const colDLC = 3;
+  const colBase8 = 9;
+  const colPrixDegagement = 12;
+  const colPrixTronque = 13;
+
+  const finalData = [];
+
+  data.forEach(row => {
+    finalData.push([
+      row[colCode] ?? "",
+      row[colDesignation] ?? "",
+      row[colDLC] ?? "",
+      cleanNumber(row[colBase8]),
+      cleanNumber(row[colPrixDegagement]),
+      cleanNumber(row[colPrixTronque])
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(finalData);
+  XLSX.utils.book_append_sheet(wb, ws, "Résultats");
+  XLSX.writeFile(wb, "resultat.xlsx");
+}
+
+function cleanNumber(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+
+  if (s === "Périmé" || s === "---") return s;
+
+  const normalized = s.replace(",", ".");
+  const num = parseFloat(normalized);
+
+  return isNaN(num) ? s : num;
+}
+
+
+function cleanNumber(value) {
+  if (!value) return "";
+
+  const s = String(value).trim();
+
+  // Si la valeur contient une virgule ou un point, on tente une conversion
+  const normalized = s.replace(",", ".");
+  const num = parseFloat(normalized);
+
+  // Si c'est un vrai nombre → on le renvoie
+  if (!isNaN(num)) return num;
+
+  // Sinon → valeur métier → on la laisse telle quelle
+  return s;
+}
+
+
 
 
