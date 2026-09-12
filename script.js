@@ -351,35 +351,99 @@ function exporterXLSX(data) {
 
   const finalData = [];
 
-  data.forEach(row => {
+  // --- Style de l'en-tête ---
+  const headerStyle = {
+    fill: { fgColor: { rgb: "D9D9D9" } }, // gris clair
+    font: { bold: true },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top:    { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left:   { style: "medium", color: { rgb: "000000" } },
+      right:  { style: "medium", color: { rgb: "000000" } }
+    }
+  };
+
+  // --- Style normal pour les données ---
+  const normalStyle = {
+    alignment: { horizontal: "center", vertical: "center" },
+    font: { bold: true},
+    border: {
+      top:    { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left:   { style: "medium", color: { rgb: "000000" } },
+      right:  { style: "medium", color: { rgb: "000000" } }
+    }
+  };
+
+    // --- Style rouge pour le prix tronqué ---
+  const redStyle = {
+    alignment: { horizontal: "center", vertical: "center" },
+    font: { bold: true, color: { rgb: "FF0000"} },
+    border: {
+      top:    { style: "medium", color: { rgb: "FF0000" } },
+      bottom: { style: "medium", color: { rgb: "FF0000" } },
+      left:   { style: "medium", color: { rgb: "FF0000" } },
+      right:  { style: "medium", color: { rgb: "FF0000" } }
+    }
+  };
+
+  // --- Ligne d'en-tête (data[0]) ---
+  finalData.push([
+    { v: data[0][colCode], s: headerStyle },
+    { v: data[0][colDesignation], s: headerStyle },
+    { v: data[0][colDLC], s: headerStyle },
+    { v: data[0][colBase8], s: headerStyle },
+    { v: data[0][colPrixDegagement], s: headerStyle },
+    { v: data[0][colPrixTronque], s: headerStyle }
+  ]);
+
+  // --- Booléen pour savoir si la répétition est passée ---
+  let repeatPassed = false;
+
+  // --- Données ---
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+
+    // Détection d'une ligne d'entête répétée
+    const firstCell = String(row[colCode] ?? "").trim();
+    const isHeaderRepeat = /^[A-Za-z]/.test(firstCell);
+
+    let style;
+
+    if (isHeaderRepeat) {
+      style = headerStyle;
+      repeatPassed = true;
+    } else {
+      style = repeatPassed ? normalStyle : redStyle;
+    }
+
     finalData.push([
-      row[colCode] ?? "",
-      row[colDesignation] ?? "",
-      row[colDLC] ?? "",
-      cleanNumber(row[colBase8]),
-      cleanNumber(row[colPrixDegagement]),
-      cleanNumber(row[colPrixTronque])
+      { v: row[colCode] ?? "", s: style },
+      { v: row[colDesignation] ?? "" ,s: style},
+      { v: row[colDLC] ?? "", s: style },
+      { v: cleanNumber(row[colBase8]), s: style },
+      { v: cleanNumber(row[colPrixDegagement]), s: style },
+      { v: cleanNumber(row[colPrixTronque]), s: style }
     ]);
-  });
+  }
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(finalData);
+
+  // Largeurs de colonnes
+  ws['!cols'] = [
+    { wch: 8 },
+    { wch: 48 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 12 }
+  ];
+
   XLSX.utils.book_append_sheet(wb, ws, "Résultats");
   XLSX.writeFile(wb, "resultat.xlsx");
 }
-
-function cleanNumber(value) {
-  if (!value) return "";
-  const s = String(value).trim();
-
-  if (s === "Périmé" || s === "---") return s;
-
-  const normalized = s.replace(",", ".");
-  const num = parseFloat(normalized);
-
-  return isNaN(num) ? s : num;
-}
-
 
 function cleanNumber(value) {
   if (!value) return "";
@@ -396,7 +460,6 @@ function cleanNumber(value) {
   // Sinon → valeur métier → on la laisse telle quelle
   return s;
 }
-
 
 
 
