@@ -93,6 +93,7 @@ function traiterHTML(doc) {
   afficherResultat(currentData);
   document.getElementById("exportBtn").style.display = "inline-block";
   document.getElementById("exportBtnXls").style.display = "inline-block";
+  document.getElementById("exportBtnXlsMail").style.display = "inline-block";
   document.getElementById("toggleBtn").style.display = "inline-block";
 
 }
@@ -254,8 +255,17 @@ function afficherResultat(data) {
   let html = '<table id="myTable">';
 
   data.forEach((row, index) => {
+
+    // Détection des lignes d'en-tête (première cellule = "Code")
+    const isHeader = row[0] === "Code";
+
+    // Ligne grise toutes les 5 lignes
     const grey = (index % 5 === 0) ? ' class="row-grey"' : '';
-    html += `<tr${grey}>` +
+
+    // Ajout de la classe header-row si c'est un header
+    const headerClass = isHeader ? ' class="header-row"' : '';
+
+    html += `<tr${grey}${headerClass}>` +
       row.map((cell, colIndex) => {
         const isblue = (index > 0 && colIndex === 13) ? ' class="blueprice"' : '';
         return `<td${isblue}>${cell}</td>`;
@@ -266,6 +276,7 @@ function afficherResultat(data) {
   html += "</table>";
   container.innerHTML = html;
 }
+
 
 
 document.getElementById("exportBtn").addEventListener("click", function () {
@@ -461,5 +472,158 @@ function cleanNumber(value) {
   return s;
 }
 
+document.getElementById("exportBtnXlsMail").addEventListener("click", function () {
+  exporterXLSX2(currentData);
+});
+
+function parseFrenchDate(str) {
+  if (!str) return null;
+  const parts = str.split("/");
+  if (parts.length !== 3) return null;
+  const [jour, mois, annee] = parts.map(p => parseInt(p, 10));
+  if (!jour || !mois || !annee) return null;
+  return new Date(annee, mois - 1, jour);
+}
+
+// Conversion Date JS -> numéro de série Excel
+function toExcelDate(date) {
+  const excelEpoch = new Date(1899, 11, 30); // 30/12/1899
+  const diffMs = date - excelEpoch;
+  return diffMs / (24 * 60 * 60 * 1000);
+}
+
+function exporterXLSX2(data) {
+  // Colonnes à exporter
+  const cols = [0, 1, 2, 3, 4, 5, 6, 7, 13, 11];
+
+  // Largeurs correspondantes
+  const colWidths = [15, 60, 10, 20, 10, 13, 10, 10, 15, 20];
+
+  const finalData = [];
+
+  // --- Styles identiques à ta version actuelle ---
+  const headerStyle = {
+    fill: { fgColor: { rgb: "D9D9D9" } },
+    font: { bold: true },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top:    { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left:   { style: "medium", color: { rgb: "000000" } },
+      right:  { style: "medium", color: { rgb: "000000" } }
+    }
+  };
+
+  const normalStyle = {
+    alignment: { horizontal: "center", vertical: "center" },
+    font: { bold: true },
+    border: {
+      top:    { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left:   { style: "medium", color: { rgb: "000000" } },
+      right:  { style: "medium", color: { rgb: "000000" } }
+    }
+  };
+
+  const redStyle = {
+    alignment: { horizontal: "center", vertical: "center" },
+    font: { bold: true, color: { rgb: "FF0000"} },
+    border: {
+      top:    { style: "medium", color: { rgb: "FF0000" } },
+      bottom: { style: "medium", color: { rgb: "FF0000" } },
+      left:   { style: "medium", color: { rgb: "FF0000" } },
+      right:  { style: "medium", color: { rgb: "FF0000" } }
+    }
+  };
+
+  // --- Ligne d'entête ---
+  finalData.push(
+    cols.map(c => ({
+      v: c === 13 ? "Prix vente" : data[0][c],
+      s: headerStyle
+    }))
+  );
+
+  // --- Booléen pour savoir si la répétition est passée ---
+  let repeatPassed = false;
+
+  // --- Données ---
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const firstCell = String(row[cols[0]] ?? "").trim();
+    const isHeaderRepeat = /^[A-Za-z]/.test(firstCell);
+
+    if (isHeaderRepeat) {
+      repeatPassed = true;
+
+      finalData.push(
+        cols.map(c => ({
+          v: c === 13 ? "Prix vente" : row[c],
+          s: headerStyle
+        }))
+      );
+
+      continue;
+    }
+
+    const style = repeatPassed ? normalStyle : redStyle;
+
+    finalData.push(
+      cols.map(c => {
+        let value = row[c];
+        let format = undefined;
+
+        // Colonne 3 : date courte
+        if (c === 3) {
+          const d = parseFrenchDate(String(value).trim());
+          if (d) {
+            value = Math.floor(toExcelDate(d));
+            return {
+              v: value,
+              t: "n",
+              z: "dd/mm/yyyy",
+              s: style
+            };
+          }
+        }
+
+        // Colonne 13 : monétaire
+        if (c === 13) {
+          const num = parseFloat(String(value).trim());
+          if (!isNaN(num)) {
+            return {
+              v: num,
+              t: "n",
+              z: "#,##0.00",
+              s: style
+            };
+          }
+        }
+
+
+        // Autres colonnes
+        else {
+          value = cleanNumber(value);
+        }
+
+        return {
+          v: value,
+          s: style,   // ton style rouge / normal / header
+          z: format   // format Excel
+        };
+      })
+    );
+  }
+
+  // --- Création du fichier ---
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(finalData);
+
+  // Largeurs de colonnes
+  ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+  XLSX.utils.book_append_sheet(wb, ws, "Résultats");
+  XLSX.writeFile(wb, "resultat.xlsx");
+}
 
 
