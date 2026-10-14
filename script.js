@@ -1,39 +1,76 @@
 let currentData = [];
 
-// Barème
-const bareme = [
-  { jour: 3, reduc: 0.5 },
-  { jour: 4, reduc: 0.6 },
-  { jour: 5, reduc: 0.7 },
-  { jour: 6, reduc: 0.8 },
-  { jour: 10, reduc: 0.9 },
-];
+// ======================================================
+// CONFIGURATION METIER
+// ======================================================
 
-// Liste des jours fériés
-const joursFeries = [
-  "2025-01-01",
-  "2025-04-21",
-  "2025-05-01",
-  "2025-05-08",
-  "2025-05-29",
-  "2025-06-09",
-  "2025-07-14",
-  "2025-08-15",
-  "2025-11-01",
-  "2025-11-11",
-  "2025-12-25",
-  "2026-01-01",
-  "2026-04-06",
-  "2026-05-01",
-  "2026-05-08",
-  "2026-05-14",
-  "2026-05-25",
-  "2026-07-14",
-  "2026-08-15",
-  "2026-11-01",
-  "2026-11-11",
-  "2026-12-25",
-].map((d) => new Date(d).setHours(0, 0, 0, 0));
+const CONFIG = {
+
+  // Colonnes du fichier source importé
+  COL: {
+    CODE: 0,                       // Code article
+    DESIGNATION: 1,                // Désignation
+    GAMME: 2,                      // Gamme
+    DLC: 3,                        // Date Limite de Consommation
+    PCBV: 4,                       // PCBV
+    UNITE: 5,                      // Unité
+    COLIS: 6,                      // Colis
+    PIECES: 7,                     // Pièces
+    BASE_CO: 8,                    // Base Co
+    PRIX: 9,                       // Base 8 / Prix utilisé pour le calcul
+    STOCK: 10,                     // Stock
+    UNITE_FACTURATION: 11,         // Unité de facturation vente
+
+    // Colonnes calculées ajoutées par calculerPrix()
+    PRIX_DEGAGEMENT: 12,           // Prix après application du barème
+    PRIX_TRONQUE: 13,              // Prix de vente final
+    POURCENTAGE: 14,               // % appliqué
+    SAMEDI: 15,                    // Nombre de samedis
+    DIMANCHE: 16,                  // Nombre de dimanches
+    FERIES: 17,                    // Nombre de jours fériés
+    AJUSTEMENT: 18                 // Réajustement fériés/week-end
+  },
+
+  // Barème de réduction
+  BAREME: [
+    { jour: 3, reduc: 0.5 },
+    { jour: 4, reduc: 0.6 },
+    { jour: 5, reduc: 0.7 },
+    { jour: 6, reduc: 0.8 },
+    { jour: 10, reduc: 0.9 }
+  ],
+
+  // Colonnes exportées dans le fichier mail magasin
+  EXPORT_MAIL_COLS: [
+    "CODE",
+    "DESIGNATION",
+    "GAMME",
+    "DLC",
+    "PCBV",
+    "UNITE",
+    "COLIS",
+    "PIECES",
+    "PRIX_TRONQUE",
+    "UNITE_FACTURATION"
+  ],
+
+  // Largeurs des colonnes XLSX pour l'export mail
+  EXPORT_MAIL_WIDTHS: [
+    15, // Code
+    60, // Désignation
+    10, // Gamme
+    20, // DLC
+    10, // PCBV
+    13, // Unité
+    10, // Colis
+    10, // Pièces
+    15, // Prix vente
+    20  // Unité facturation vente
+  ]
+};
+
+// Liste dynamique des jours fériés
+const joursFeriesCache = new Map();
 
 document
   .getElementById("fileInput")
@@ -118,9 +155,8 @@ function calculerPrix(data) {
 
   // Parcourt les lignes de données à partir de l'index 2 (ligne 3 Excel)
   for (let i = 1; i < data.length; i++) {
-    const dlcStr = data[i][3]; // DLC en colonne D (index 3)
-    // const prixStr = data[i][8]; // Prix en colonne I (index 8)
-    const prixStr = data[i][9]; // Prix en colonne J (index 9) Base 8
+    const dlcStr = data[i][CONFIG.COL.DLC]; 
+    const prixStr = data[i][CONFIG.COL.PRIX]; 
 
     const dlc = parseDateFR(dlcStr);
     if (!dlc) {
@@ -157,6 +193,8 @@ function calculerPrix(data) {
       const jour = d.getDay(); // 0=dimanche, 6=samedi
       const estFerie = isHoliday(d);
 
+      // Un jour férié tombant un week-end a déjà été décompté
+      // via le week-end. On le réajoute donc pour éviter un double retrait
       if (jour === 6) {
         nbSamedi++;
         if (estFerie) nbAjustement++;
@@ -235,22 +273,89 @@ function daysBetween(a, b) {
   return Math.round((utcB - utcA) / msPerDay);
 }
 
+function calculerPaques(annee) {
+  const a = annee % 19;
+  const b = Math.floor(annee / 100);
+  const c = annee % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+
+  const mois = Math.floor((h + l - 7 * m + 114) / 31);
+  const jour = ((h + l - 7 * m + 114) % 31) + 1;
+
+  return new Date(annee, mois - 1, jour);
+}
+
+function getJoursFeries(annee) {
+  const feries = [];
+
+  // Fêtes fixes
+  feries.push(
+    new Date(annee, 0, 1).setHours(0, 0, 0, 0),
+    new Date(annee, 4, 1).setHours(0, 0, 0, 0),
+    new Date(annee, 4, 8).setHours(0, 0, 0, 0),
+    new Date(annee, 6, 14).setHours(0, 0, 0, 0),
+    new Date(annee, 7, 15).setHours(0, 0, 0, 0),
+    new Date(annee, 10, 1).setHours(0, 0, 0, 0),
+    new Date(annee, 10, 11).setHours(0, 0, 0, 0),
+    new Date(annee, 11, 25).setHours(0, 0, 0, 0)
+  );
+
+  const paques = calculerPaques(annee);
+
+  const lundiPaques = new Date(paques);
+  lundiPaques.setDate(lundiPaques.getDate() + 1);
+
+  const ascension = new Date(paques);
+  ascension.setDate(ascension.getDate() + 39);
+
+  const pentecote = new Date(paques);
+  pentecote.setDate(pentecote.getDate() + 50);
+
+  feries.push(
+    lundiPaques.setHours(0, 0, 0, 0),
+    ascension.setHours(0, 0, 0, 0),
+    pentecote.setHours(0, 0, 0, 0)
+  );
+
+  return new Set(feries);
+}
+
 function isHoliday(dateObj) {
+  const annee = dateObj.getFullYear();
+
+  if (!joursFeriesCache.has(annee)) {
+    joursFeriesCache.set(
+      annee,
+      getJoursFeries(annee)
+    );
+  }
+
   const t = new Date(dateObj);
   t.setHours(0, 0, 0, 0);
-  return joursFeries.includes(t.getTime());
+
+  return joursFeriesCache
+    .get(annee)
+    .has(t.getTime());
 }
 
 function appliquerBareme(ecart) {
-  // Si la DLC est passée (écart négatif), on signale "Périmé"
   if (ecart < 0) return null;
 
-  if (ecart <= 3) return 0.5;
-  if (ecart === 4) return 0.6;
-  if (ecart === 5) return 0.7;
-  if (ecart === 6) return 0.8;
-  if (ecart <= 10) return 0.9;
-  return 1; // au-delà de 10 jours → prix d'origine
+  for (const ligne of CONFIG.BAREME) {
+    if (ecart <= ligne.jour) {
+      return ligne.reduc;
+    }
+  }
+
+  return 1;
 }
 
 function afficherResultat(data) {
@@ -260,7 +365,7 @@ function afficherResultat(data) {
   data.forEach((row, index) => {
 
     // Détection des lignes d'en-tête (première cellule = "Code")
-    const isHeader = row[0] === "Code";
+    const isHeader = row[CONFIG.COL.CODE] === "Code";
 
     // Ligne grise toutes les 5 lignes
     const grey = (index % 5 === 0) ? ' class="row-grey"' : '';
@@ -270,7 +375,7 @@ function afficherResultat(data) {
 
     html += `<tr${grey}${headerClass}>` +
       row.map((cell, colIndex) => {
-        const isblue = (index > 0 && colIndex === 13) ? ' class="blueprice"' : '';
+        const isblue = (index > 0 && colIndex === CONFIG.COL.PRIX_TRONQUE) ? ' class="blueprice"' : '';
         return `<td${isblue}>${cell}</td>`;
       }).join("") +
       "</tr>";
@@ -287,27 +392,20 @@ document.getElementById("exportBtn").addEventListener("click", function () {
 });
 
 function exporterCSV(data) {
-  // Définir les index des colonnes à garder
-  const colCode = 0;          // Colonne A = Code
-  const colDesignation = 1;   // Colonne B = Designation
-  const colDLC = 3;           // Colonne D = DLC
-  const colBaseCo = 9;        // Colonne I = Base 8
-  const colPrixDegagement = 12; // Prix Dégagement ajouté en premier des colonnes calculées
-  const colPrixTronque = 13; // Prix Tronque soit la derniere colonne
 
   // Fonction pour sécuriser les champs CSV
   const safeRow = row => {
     const subset = [
-      row[colCode] ?? "",
-      row[colDesignation] ?? "",
-      row[colDLC] ?? "",
-      row[colBaseCo] ?? "",
+      row[CONFIG.COL.CODE] ?? "",
+      row[CONFIG.COL.DESIGNATION] ?? "",
+      row[CONFIG.COL.DLC] ?? "",
+      row[CONFIG.COL.PRIX] ?? "",
       // conversion du prix : nombre → string avec virgule
-      (row[colPrixDegagement] != null
-      ? String(row[colPrixDegagement]).replace(".", ",")
+      (row[CONFIG.COL.PRIX_DEGAGEMENT] != null
+      ? String(row[CONFIG.COL.PRIX_DEGAGEMENT]).replace(".", ",")
       : ""),
-      (row[colPrixTronque] != null
-      ? String(row[colPrixTronque]).replace(".", ",")
+      (row[CONFIG.COL.PRIX_TRONQUE] != null
+      ? String(row[CONFIG.COL.PRIX_TRONQUE]).replace(".", ",")
       : ""),
   ];
     return subset.map(val => {
@@ -356,13 +454,6 @@ document.getElementById("exportBtnXls").addEventListener("click", function () {
 });
 
 function exporterXLSX(data) {
-  const colCode = 0;
-  const colDesignation = 1;
-  const colDLC = 3;
-  const colBase8 = 9;
-  const colPrixDegagement = 12;
-  const colPrixTronque = 13;
-
   const finalData = [];
 
   // --- Style de l'en-tête ---
@@ -404,12 +495,12 @@ function exporterXLSX(data) {
 
   // --- Ligne d'en-tête (data[0]) ---
   finalData.push([
-    { v: data[0][colCode], s: headerStyle },
-    { v: data[0][colDesignation], s: headerStyle },
-    { v: data[0][colDLC], s: headerStyle },
-    { v: data[0][colBase8], s: headerStyle },
-    { v: data[0][colPrixDegagement], s: headerStyle },
-    { v: data[0][colPrixTronque], s: headerStyle }
+    { v: data[0][CONFIG.COL.CODE], s: headerStyle },
+    { v: data[0][CONFIG.COL.DESIGNATION], s: headerStyle },
+    { v: data[0][CONFIG.COL.DLC], s: headerStyle },
+    { v: data[0][CONFIG.COL.PRIX], s: headerStyle },
+    { v: data[0][CONFIG.COL.PRIX_DEGAGEMENT], s: headerStyle },
+    { v: data[0][CONFIG.COL.PRIX_TRONQUE], s: headerStyle }
   ]);
 
   // --- Booléen pour savoir si la répétition est passée ---
@@ -420,7 +511,7 @@ function exporterXLSX(data) {
     const row = data[i];
 
     // Détection d'une ligne d'entête répétée
-    const firstCell = String(row[colCode] ?? "").trim();
+    const firstCell = String(row[CONFIG.COL.CODE] ?? "").trim();
     const isHeaderRepeat = /^[A-Za-z]/.test(firstCell);
 
     let style;
@@ -433,12 +524,12 @@ function exporterXLSX(data) {
     }
 
     finalData.push([
-      { v: row[colCode] ?? "", s: style },
-      { v: row[colDesignation] ?? "" ,s: style},
-      { v: row[colDLC] ?? "", s: style },
-      { v: cleanNumber(row[colBase8]), s: style },
-      { v: cleanNumber(row[colPrixDegagement]), s: style },
-      { v: cleanNumber(row[colPrixTronque]), s: style }
+      { v: row[CONFIG.COL.CODE] ?? "", s: style },
+      { v: row[CONFIG.COL.DESIGNATION] ?? "" ,s: style},
+      { v: row[CONFIG.COL.DLC] ?? "", s: style },
+      { v: cleanNumber(row[CONFIG.COL.PRIX]), s: style },
+      { v: cleanNumber(row[CONFIG.COL.PRIX_DEGAGEMENT]), s: style },
+      { v: cleanNumber(row[CONFIG.COL.PRIX_TRONQUE]), s: style }
     ]);
   }
 
@@ -497,10 +588,12 @@ function toExcelDate(date) {
 
 function exporterXLSX2(data) {
   // Colonnes à exporter
-  const cols = [0, 1, 2, 3, 4, 5, 6, 7, 13, 11];
+  const cols = CONFIG.EXPORT_MAIL_COLS.map(
+    col => CONFIG.COL[col]
+  );
 
   // Largeurs correspondantes
-  const colWidths = [15, 60, 10, 20, 10, 13, 10, 10, 15, 20];
+  const colWidths = CONFIG.EXPORT_MAIL_WIDTHS;
 
   const finalData = [];
 
@@ -542,7 +635,7 @@ function exporterXLSX2(data) {
   // --- Ligne d'entête ---
   finalData.push(
     cols.map(c => ({
-      v: c === 13 ? "Prix vente" : data[0][c],
+      v: c === CONFIG.COL.PRIX_TRONQUE ? "Prix vente" : data[0][c],
       s: headerStyle
     }))
   );
@@ -561,7 +654,7 @@ function exporterXLSX2(data) {
 
       finalData.push(
         cols.map(c => ({
-          v: c === 13 ? "Prix vente" : row[c],
+          v: c === CONFIG.COL.PRIX_TRONQUE ? "Prix vente" : row[c],
           s: headerStyle
         }))
       );
@@ -576,8 +669,8 @@ function exporterXLSX2(data) {
         let value = row[c];
         let format = undefined;
 
-        // Colonne 3 : date courte
-        if (c === 3) {
+        // Colonne DLC : format date courte
+        if (c === CONFIG.COL.DLC) {
           const d = parseFrenchDate(String(value).trim());
           if (d) {
             value = Math.floor(toExcelDate(d));
@@ -590,8 +683,8 @@ function exporterXLSX2(data) {
           }
         }
 
-        // Colonne 13 : monétaire
-        if (c === 13) {
+        // Colonne prix tronqué : format monétaire
+        if (c === CONFIG.COL.PRIX_TRONQUE) {
           const num = parseFloat(String(value).trim());
           if (!isNaN(num)) {
             return {
@@ -628,5 +721,4 @@ function exporterXLSX2(data) {
   XLSX.utils.book_append_sheet(wb, ws, "Résultats");
   XLSX.writeFile(wb, "resultat.xlsx");
 }
-
 
