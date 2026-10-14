@@ -20,6 +20,21 @@ body { font-family: Arial, sans-serif; margin: 20px; }
   color: #0a7;
 }
 
+.btn-legacy {
+    background-color: #dcdcdc;
+    color: #666;
+    border: 1px solid #999;
+    opacity: 0.75;
+}
+
+.btn-main {
+    background-color: #2e8b57;
+    color: white;
+    font-weight: bold;
+    border: 2px solid #1f5e3b;
+    box-shadow: 0 0 6px rgba(46,139,87,0.4);
+}
+
 .blueprice {
   color: blue;
   font-weight: bold;
