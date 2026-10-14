@@ -178,11 +178,14 @@ function calculerPrix(data) {
     let prixDegagement = "";
     let pourcentage = "";
     let prixTronque = "";
+    
     if (!isNaN(prix)) {
-      prixDegagement = (prix * reduction).toFixed(2);
+      const prixDegagementNum = Math.floor(prix * reduction * 100) / 100;
+    
+      prixDegagement = prixDegagementNum.toFixed(2);
       pourcentage = ((1 - reduction) * 100).toFixed(0) + "%";
-      prixTronque = (Math.floor(parseFloat(prixDegagement) * 10) / 10).toFixed(2);
-
+      prixTronque = (Math.floor(prixDegagementNum * 10) / 10).toFixed(2);
+    
     } else {
       prixDegagement = "Prix manquant";
       pourcentage = "";
